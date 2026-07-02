@@ -1,6 +1,6 @@
-# Circuit OCR Dataset Final (V5 Golden)
+# Circuit OCR Dataset Final (V9 Pure OCR)
 
-Multi-source balanced dataset for circuit schematic OCR fine-tuning.
+Purified literal visual OCR dataset for circuit schematic OCR fine-tuning, strictly aligned with visible image text.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![HuggingFace](https://img.shields.io/badge/🤗-HuggingFace%20Space-orange)](https://huggingface.co/spaces/yingchu83/CircuitOCR)
@@ -10,39 +10,38 @@ Multi-source balanced dataset for circuit schematic OCR fine-tuning.
 | Source | Samples | GT Method | Quality |
 |--------|:-------:|-----------|---------|
 | Synthetic V3 | 500 | `draw.text()` sync recording | 100% aligned |
-| train-real (KiCad) | 1,357 | SVG stroked-text extraction | Visible text only |
-| Masala-CHAI (filtered) | 698 | SPICE netlist + artifact cleaning | Deterministic |
-| **Total** | **2,555** | | |
+| train-real (KiCad) | 1,357 | SVG stroked-text extraction | 100% visible text only |
+| **Total** | **1,857** | | |
 
 ## Split
 
-| Split | Samples | KiCad | Masala |
-|-------|:-------:|:-----:|:------:|
-| Train | 2,299 | 1,666 | 633 |
-| Val | 256 | 191 | 65 |
+| Split | Samples | avg Lines | avg Chars |
+|-------|:-------:|:---------:|:---------:|
+| Train | 1,554 | 32.1 | 265 |
+| Val | 171 | 33.4 | 278 |
 
-Test set uses existing benchmark: easy50 / easy100 / easy200 / full523 (523 samples total).
+Test set uses clean PNG-only subsets (easy50-pure: 44 samples, easy100-pure: 89 samples).
 
 ## Key Features
 
-- **GT 100% from deterministic sources**: No AI-generated labels
-- **Format aligned with test set**: KiCad labels use one-word-per-line vertical format (98.6% match with test)
-- **Balanced composition**: Masala:KiCad = 0.38:1, prevents SPICE format from dominating
-- **No intra-line duplication noise**: 99.5% reduction vs V4 dataset (22,340 → 107 dups)
+- **100% visual-literal aligned**: Discards logical netlist files (like SPICE netlists) containing invisible nodes (like hidden ground `VSS` or `GND`), preventing logical hallucination.
+- **GT 100% from deterministic sources**: No AI-generated labels.
+- **Format aligned with test set**: KiCad labels use one-word-per-line vertical format (98.6% match with test).
+- **No intra-line duplication noise**: 99.5% reduction vs V4 dataset (22,340 → 107 dups).
 
-## Latest Benchmark (V8-Fixed Model)
+## Latest Benchmark (V9-Pure Model)
 
 | Metric | Value |
 |--------|-------|
-| easy100 Avg. NED | **0.7760** (Base 0.8999, -44.4% error) |
-| easy50 Avg. NED | **0.8257** (Base 0.9634, -37.6% error) |
+| easy100-pure Avg. NED | **0.7797** (Base 0.9390, -17.0% relative error) |
+| easy50-pure Avg. NED | **0.7869** (Base 0.9424, -16.5% relative error) |
 | Architecture | Wide LoRA r=16, alpha=32, 5.7M params |
-| Training | 3 epochs, 2,299 samples, RTX 4060 8GB |
+| Training | 3 epochs, 1,554 samples, RTX 4060 8GB (~34 mins) |
 
 ## Files
 
-- `ocr_vl_sft-train-v5-golden.jsonl` — 2,299 training samples
-- `ocr_vl_sft-val-v5-golden.jsonl` — 256 validation samples
+- `ocr_vl_sft-train-v9-pure.jsonl` — 1,554 training samples
+- `ocr_vl_sft-val-v9-pure.jsonl` — 171 validation samples
 - `ocr_vl_sft-synthetic-v3.jsonl` — 500 synthetic samples (reference)
 
 ## Links
