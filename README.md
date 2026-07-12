@@ -29,7 +29,26 @@ Test set uses clean PNG-only subsets (easy50-pure: 44 samples, easy100-pure: 89 
 - **Format aligned with test set**: KiCad labels use one-word-per-line vertical format (98.6% match with test).
 - **No intra-line duplication noise**: 99.5% reduction vs V4 dataset (22,340 → 107 dups).
 
-## Latest Benchmark (V9-Pure Model)
+## Latest Benchmark (V10-Fixed Model, Phase 1)
+
+> Evaluated with `eval_benchmark_v3.py` on easy50-pure (44 samples), using LoRAModel wrapper + `p.set_value()`
+
+| Model | ExactMatch | CompF1 | TokenRecall | NED ↓ | RepRate | Diversity |
+|:---|---:|---:|---:|---:|---:|---:|
+| Base (PaddleOCR-VL-0.9B) | 0% | 0.0455 | 0.0016 | 0.9296 | 6.8% | 90.9% |
+| S400 (LoRA step 400) | 0% | 0.1820 | 0.1302 | 0.8298 | 20.5% | 95.5% |
+| **S600 (LoRA step 600)** ★ | 0% | **0.2061** | **0.1540** | **0.8031** | 15.9% | 90.9% |
+| S800 (LoRA step 800) | 0% | 0.2080 | 0.1191 | 0.8063 | 40.9% | 93.2% |
+
+### Key Findings (Phase 1)
+- **Component F1**: 4.5× improvement over base (0.0455 → 0.2061)
+- **Token Recall**: 96× improvement (0.0016 → 0.1540)
+- **NED**: 13.6% relative error reduction (0.9296 → 0.8031)
+- **S600 is the best checkpoint**; S800 shows overfitting (repetition rate 40.9%)
+- **Exact match remains 0%** — model recognizes individual components but cannot yet reconstruct full netlists
+- **eval_benchmark_v3.py** fixes the `set_state_dict` returning `None` bug in Paddle 3.1.0
+
+### Previous Benchmark (V9-Pure, easy100-pure)
 
 | Metric | Value |
 |--------|-------|
