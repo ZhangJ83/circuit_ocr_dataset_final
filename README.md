@@ -1,86 +1,145 @@
-# Circuit OCR Dataset Final (V9 Pure OCR)
-
-Purified literal visual OCR dataset for circuit schematic OCR fine-tuning, strictly aligned with visible image text.
+# Circuit OCR Dataset Final
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![HuggingFace](https://img.shields.io/badge/🤗-HuggingFace%20Space-orange)](https://huggingface.co/spaces/yingchu83/CircuitOCR)
+[![PaddleOCR-VL](https://img.shields.io/badge/Model-PaddleOCR--VL--0.9B-blue)](https://github.com/PaddlePaddle/PaddleOCR)
+[![HuggingFace](https://img.shields.io/badge/Demo-HuggingFace-orange)](https://huggingface.co/spaces/yingchu83/CircuitOCR)
 
-## Dataset Composition
+Two circuit schematic OCR datasets for fine-tuning Vision-Language Models. See the [main project](https://github.com/ZhangJ83/circuit-ocr-paddle) for training code, evaluation scripts, and Beamer slides.
 
-| Source | Samples | GT Method | Quality |
-|--------|:-------:|-----------|---------|
-| Synthetic V3 | 500 | `draw.text()` sync recording | 100% aligned |
-| train-real (KiCad) | 1,357 | SVG stroked-text extraction | 100% visible text only |
-| **Total** | **1,857** | | |
+---
 
-## Split
+## Dataset A: Strict Annotation + Mixed Training (Recommended)
 
-| Split | Samples | avg Lines | avg Chars |
-|-------|:-------:|:---------:|:---------:|
-| Train | 1,554 | 32.1 | 265 |
-| Val | 171 | 33.4 | 278 |
+**The flagship dataset.** 1,820 samples with rigorously verified annotations, synthetic text-recognition data for anti-collapse training, and real-camera photos for robustness.
 
-Test set uses clean PNG-only subsets (easy50-pure: 44 samples, easy100-pure: 89 samples).
+### Composition
 
-## Key Features
+| Component | Samples | Description |
+|-----------|:-------:|-------------|
+| Circuit schematics (KiCad) | 1,200 | Stroked-text extraction, 7-round GT verification |
+| Synthetic text-recognition | 300 | Document-style rendered circuit text for visual-text alignment |
+| Real-camera photos | 20 | Photographed printed schematics (Easy/Medium/Hard split) |
+| **Total Train** | **1,520** | |
+| Test set | 150 | Held-out, no overlap with training |
+| Validation set | 150 | For hyperparameter tuning |
 
-- **100% visual-literal aligned**: Discards logical netlist files (like SPICE netlists) containing invisible nodes (like hidden ground `VSS` or `GND`), preventing logical hallucination.
-- **GT 100% from deterministic sources**: No AI-generated labels.
-- **Format aligned with test set**: KiCad labels use one-word-per-line vertical format (98.6% match with test).
-- **No intra-line duplication noise**: 99.5% reduction vs V4 dataset (22,340 → 107 dups).
+### Key Features
 
-## Latest Benchmark (V10-Fixed Model, Phase 1)
+- **40,000+ OCR instances** in training set (component refdes + values + pin numbers)
+- **Anti-collapse synthetic data**: 300 text images at 20% ratio force vision-text alignment
+- **Real-camera subset**: 20 photographed schematics (6 easy / 8 medium / 6 hard)
+- **Multi-type coverage**: Resistors (R), Capacitors (C), ICs (U), Connectors (J), Diodes (D), Transistors (Q), Inductors (L), LEDs, Fuses (F), Crystals (Y)
+- **7-round annotation verification** with manual correction
 
-> Evaluated with `eval_benchmark_v3.py` on easy50-pure (44 samples), using LoRAModel wrapper + `p.set_value()`
+### Data Format (JSONL)
 
-| Model | ExactMatch | CompF1 | TokenRecall | NED ↓ | RepRate | Diversity |
-|:---|---:|---:|---:|---:|---:|---:|
-| Base (PaddleOCR-VL-0.9B) | 0% | 0.0455 | 0.0016 | 0.9296 | 6.8% | 90.9% |
-| S400 (LoRA step 400) | 0% | 0.1820 | 0.1302 | 0.8298 | 20.5% | 95.5% |
-| **S600 (LoRA step 600)** ★ | 0% | **0.2061** | **0.1540** | **0.8031** | 15.9% | 90.9% |
-| S800 (LoRA step 800) | 0% | 0.2080 | 0.1191 | 0.8063 | 40.9% | 93.2% |
+```json
+{
+  "messages": [
+    {"role": "user", "content": "<image>OCR:"},
+    {"role": "assistant", "content": "R1  10kΩ  ±1%\nR2  2.2kΩ  ±5%\nC1  100nF  50V\n..."}
+  ],
+  "images": ["images/train_0686.png"]
+}
+```
 
-### Key Findings (Phase 1)
-- **Component F1**: 4.5× improvement over base (0.0455 → 0.2061)
-- **Token Recall**: 96× improvement (0.0016 → 0.1540)
-- **NED**: 13.6% relative error reduction (0.9296 → 0.8031)
-- **S600 is the best checkpoint**; S800 shows overfitting (repetition rate 40.9%)
-- **Exact match remains 0%** — model recognizes individual components but cannot yet reconstruct full netlists
-- **eval_benchmark_v3.py** fixes the `set_state_dict` returning `None` bug in Paddle 3.1.0
+### Difficulty Distribution (Test Set)
 
-### Previous Benchmark (V9-Pure, easy100-pure)
+| Difficulty | OCR Instances | Samples |
+|------------|:------------:|:-------:|
+| Easy | < 15 | ~30 |
+| Medium | 15–35 | ~60 |
+| Hard | > 35 | ~60 |
 
-| Metric | Value |
-|--------|-------|
-| easy100-pure Avg. NED | **0.7797** (Base 0.9390, -17.0% relative error) |
-| easy50-pure Avg. NED | **0.7869** (Base 0.9424, -16.5% relative error) |
-| Architecture | Wide LoRA r=16, alpha=32, 5.7M params |
-| Training | 3 epochs, 1,554 samples, RTX 4060 8GB (~34 mins) |
+### Evaluation Benchmarks
 
-## Files
+| Metric | Definition | Best Result |
+|--------|-----------|:-----------:|
+| **CompF1** | Component label F1 (R1, C2, U3...) | 0.156 |
+| **JointF1** | (Refdes, Value) pair F1 | 0.011 |
+| **NED** | Normalized Edit Distance | 0.937 |
+| **RepRate** | Repetition collapse detector | < 25% |
 
-- `ocr_vl_sft-train-v9-pure.jsonl` — 1,554 training samples
-- `ocr_vl_sft-val-v9-pure.jsonl` — 171 validation samples
-- `ocr_vl_sft-synthetic-v3.jsonl` — 500 synthetic samples (reference)
+*Benchmark results from Phase 2 experiments with PaddleOCR-VL-0.9B + LoRA fine-tuning.*
 
-## Links
+### Files
 
-- [GitHub Repository](https://github.com/ZhangJ83/circuit-ocr-paddle)
-- [Live Demo](https://huggingface.co/spaces/yingchu83/CircuitOCR)
-- [LoRA Weights](https://huggingface.co/yingchu83/CircuitOCR-lora)
-- [Technical Report](https://github.com/ZhangJ83/circuit-ocr-paddle/blob/master/arxiv_template/template.pdf)
+```
+dataset_a/
+├── train.jsonl          # 1,520 training samples
+├── test.jsonl           # 150 test samples
+├── val.jsonl            # 150 validation samples
+└── images/              # 1,820 images (PNG + JPG)
+```
+
+---
+
+## Dataset B: Original Heavy Annotation (Legacy)
+
+The earlier V9 Pure dataset — 2,225 samples used in Phase 1 experiments. Retained for reference and reproducibility.
+
+### Composition
+
+| File | Samples | Description |
+|------|:-------:|-------------|
+| `ocr_vl_sft-train-v9-pure.jsonl` | 1,554 | KiCad + synthetic V3, Masala excluded |
+| `ocr_vl_sft-val-v9-pure.jsonl` | 171 | Validation split |
+| `ocr_vl_sft-synthetic-v3.jsonl` | 500 | Synthetic V3 text-recognition data |
+
+### Key Differences from Dataset A
+
+| Aspect | Dataset B (V9) | Dataset A (V10+) |
+|--------|:-------------:|:----------------:|
+| Masala-CHAI data | Partially included (later removed) | Excluded |
+| Annotation rounds | 3 rounds | 7 rounds |
+| Synthetic data | 500 (separate file) | 300 (mixed at 20%) |
+| Real-camera photos | None | 20 |
+| Image path format | Relative | Absolute → converted to relative |
+| Content format | List `[{type: image}, {type: text}]` | String `<image>OCR:` |
+
+### Files
+
+```
+dataset_b/
+├── ocr_vl_sft-train-v9-pure.jsonl
+├── ocr_vl_sft-val-v9-pure.jsonl
+└── ocr_vl_sft-synthetic-v3.jsonl
+```
+
+---
+
+## Quick Start
+
+```python
+import json
+
+# Load Dataset A (recommended)
+with open('dataset_a/train.jsonl', encoding='utf-8') as f:
+    train = [json.loads(line) for line in f if line.strip()]
+
+# Each sample:
+sample = train[0]
+image_path = 'dataset_a/' + sample['images'][0]
+user_prompt = sample['messages'][0]['content']     # "<image>OCR:"
+ground_truth = sample['messages'][1]['content']    # "R1  10kΩ  ±1%\n..."
+```
 
 ## Citation
 
 ```bibtex
-@misc{zhang2026circuitocr,
-  title={PaddleOCR-VL-Circuit: Built for Schematic Diagram Understanding},
-  author={Jianning Zhang and Yifei Chen},
-  year={2026},
-  url={https://github.com/ZhangJ83/circuit-ocr-paddle},
+@misc{zhang2025circuitocr,
+  author = {Zhang, Jianning},
+  title = {CircuitOCR: Built for Schematic Diagram Understanding},
+  year = {2025},
+  publisher = {Sun Yat-sen University},
+  url = {https://github.com/ZhangJ83/circuit-ocr-paddle}
 }
 ```
 
 ## License
 
-MIT License
+MIT. Images sourced from KiCad exports and synthetic generation. Real-camera photos taken by the author.
+
+---
+
+*Maintained by Zhang Jianning (张健宁), Sun Yat-sen University (中山大学)*
